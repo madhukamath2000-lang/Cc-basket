@@ -19,7 +19,7 @@ async def get_positions():
     async with httpx.AsyncClient() as client:
         r = await client.get(
             "https://api.upstox.com/v2/portfolio/short-term-positions",
-            headers={"Authorization": f"Bearer {TOKEN}", "Accept": "application/json"}
+            headers={"Authorization": f"Bearer {TOKEN.strip()}", "Accept": "application/json"}
         )
         return r.json()
 
