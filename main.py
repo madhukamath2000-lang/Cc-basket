@@ -34,6 +34,8 @@ CC_OPTIONS = [
     {"symbol": "HDFCBANK",   "strike": 800,  "underlying": "NSE_EQ|INE040A01034", "avg": 17.25, "qty": 550, "sl": 24,  "sl_amt": 13200},
     {"symbol": "INFY",       "strike": 1230, "underlying": "NSE_EQ|INE009A01021", "avg": 24.05, "qty": 400, "sl": 36,  "sl_amt": 14400},
     {"symbol": "MAZDOCK",    "strike": 2700, "underlying": "NSE_EQ|INE249A01024", "avg": 83.05, "qty": 200, "sl": 105, "sl_amt": 21000},
+   {"symbol": "ICICIBANK", "strike": 1280, "underlying": "NSE_EQ|INE090A01021", "avg": 10.95, "qty": 700, "sl": 24, "sl_amt": 16800},
+   {"symbol": "SUNPHARMA", "strike": 1860, "underlying": "NSE_EQ|INE044A01036", "avg": 19.35, "qty": 350, "sl": 22, "sl_amt": 7700},
     {"symbol": "TATAMOTORS", "strike": 370,  "underlying": "NSE_EQ|INE155A01022", "avg": 10.30, "qty": 800, "sl": 15,  "sl_amt": 12000},
 ]
 
