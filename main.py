@@ -133,7 +133,7 @@ async def get_markets():
     try:
         results = {}
         async with httpx.AsyncClient(timeout=15) as client:
-            symbols = "XAU/USD,XAG/USD,USD/INR,AUD/INR,DXY,UKOIL"
+          symbols = "XAU/USD,XAG/USD,USD/INR,AUD/INR"
             r = await client.get(
                 f"https://api.twelvedata.com/price?symbol={symbols}&apikey={TD_KEY}"
             )
@@ -142,8 +142,3 @@ async def get_markets():
             results["xagusd"] = float(data["XAG/USD"]["price"])
             results["usdinr"] = float(data["USD/INR"]["price"])
             results["audinr"] = float(data["AUD/INR"]["price"])
-            results["dxy"]    = float(data["DXY"]["price"])
-            results["brent"]  = float(data["UKOIL"]["price"])
-        return {"status": "success", "data": results}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
