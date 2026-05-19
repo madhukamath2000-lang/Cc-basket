@@ -138,7 +138,4 @@ async def get_markets():
                 f"https://api.twelvedata.com/price?symbol={symbols}&apikey={TD_KEY}"
             )
             data = r.json()
-            results["xauusd"] = float(data["XAU/USD"]["price"])
-            results["xagusd"] = float(data["XAG/USD"]["price"])
-            results["usdinr"] = float(data["USD/INR"]["price"])
-            results["audinr"] = float(data["AUD/INR"]["price"])
+            return {"status": "success", "data": data}
