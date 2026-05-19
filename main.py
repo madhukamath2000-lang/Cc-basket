@@ -133,18 +133,17 @@ async def get_markets():
     try:
         results = {}
         async with httpx.AsyncClient(timeout=15) as client:
-            fx = await client.get("https://api.frankfurter.app/latest?from=USD&to=INR")
-            fx_aud = await client.get("https://api.frankfurter.app/latest?from=AUD&to=INR")
-            results["usdinr"] = fx.json()["rates"]["INR"]
-            results["audinr"] = fx_aud.json()["rates"]["INR"]
-         symbols = "XAU/USD,XAG/USD,USD/INR,AUD/INR,DXY,UKOIL"
+            symbols = "XAU/USD,XAG/USD,USD/INR,AUD/INR,DXY,UKOIL"
             r = await client.get(
                 f"https://api.twelvedata.com/price?symbol={symbols}&apikey={TD_KEY}"
             )
             data = r.json()
-            results["xauusd"]  = float(data["XAU/USD"]["price"])
-            results["xagusd"]  = float(data["XAG/USD"]["price"])
-            results["usdinr"]  = float(data["USD/INR"]["price"])
-            results["audinr"]  = float(data["AUD/INR"]["price"])
-            results["dxy"]     = float(data["DXY"]["price"])
-            results["brent"]   = float(data["UKOIL"]["price"])
+            results["xauusd"] = float(data["XAU/USD"]["price"])
+            results["xagusd"] = float(data["XAG/USD"]["price"])
+            results["usdinr"] = float(data["USD/INR"]["price"])
+            results["audinr"] = float(data["AUD/INR"]["price"])
+            results["dxy"]    = float(data["DXY"]["price"])
+            results["brent"]  = float(data["UKOIL"]["price"])
+        return {"status": "success", "data": results}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
