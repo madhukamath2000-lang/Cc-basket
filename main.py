@@ -128,13 +128,21 @@ async def get_options():
         "total_pnl": total_pnl,
         "data":      results,
     }
-
-
 @app.get("/markets")
 async def get_markets():
-    symbols = "XAU/USD,XAG/USD,XCU/USD,BSE:SENSEX,NSE:NIFTY,NSE:NIFTY_VIX,USD/INR,SPX,IXIC,AAPL,NVDA,META,TSLA,DXY,TVC:US10Y,BRENT,AUD/INR"
-    async with httpx.AsyncClient(timeout=15) as client:
-        r = await client.get(
-            f"https://api.twelvedata.com/quote?symbol={symbols}&apikey={TD_KEY}"
-        )
-        return r.json()
+    try:
+        results = {}
+        async with httpx.AsyncClient(timeout=15) as client:
+            fx = await client.get("https://api.frankfurter.app/latest?from=USD&to=INR")
+            fx_aud = await client.get("https://api.frankfurter.app/latest?from=AUD&to=INR")
+            results["usdinr"] = fx.json()["rates"]["INR"]
+            results["audinr"] = fx_aud.json()["rates"]["INR"]
+            metals = await client.get("https://api.metals.live/v1/spot/gold,silver")
+            for m in metals.json():
+                if "gold" in m:
+                    results["xauusd"] = m["gold"]
+                if "silver" in m:
+                    results["xagusd"] = m["silver"]
+        return {"status": "success", "data": results}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
