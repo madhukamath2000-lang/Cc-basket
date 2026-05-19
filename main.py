@@ -137,12 +137,10 @@ async def get_markets():
             fx_aud = await client.get("https://api.frankfurter.app/latest?from=AUD&to=INR")
             results["usdinr"] = fx.json()["rates"]["INR"]
             results["audinr"] = fx_aud.json()["rates"]["INR"]
-            metals = await client.get("https://api.metals.live/v1/spot/gold,silver")
-            for m in metals.json():
-                if "gold" in m:
-                    results["xauusd"] = m["gold"]
-                if "silver" in m:
-                    results["xagusd"] = m["silver"]
+           gold_r = await client.get("https://api.coinbase.com/v2/prices/XAU-USD/spot")
+            silver_r = await client.get("https://api.coinbase.com/v2/prices/XAG-USD/spot")
+            results["xauusd"] = float(gold_r.json()["data"]["amount"])
+            results["xagusd"] = float(silver_r.json()["data"]["amount"])
         return {"status": "success", "data": results}
     except Exception as e:
         return {"status": "error", "message": str(e)}
