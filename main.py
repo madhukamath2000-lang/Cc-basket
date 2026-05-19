@@ -137,10 +137,14 @@ async def get_markets():
             fx_aud = await client.get("https://api.frankfurter.app/latest?from=AUD&to=INR")
             results["usdinr"] = fx.json()["rates"]["INR"]
             results["audinr"] = fx_aud.json()["rates"]["INR"]
-           gold_r = await client.get("https://api.coinbase.com/v2/prices/XAU-USD/spot")
-            silver_r = await client.get("https://api.coinbase.com/v2/prices/XAG-USD/spot")
-            results["xauusd"] = float(gold_r.json()["data"]["amount"])
-            results["xagusd"] = float(silver_r.json()["data"]["amount"])
-        return {"status": "success", "data": results}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+         symbols = "XAU/USD,XAG/USD,USD/INR,AUD/INR,DXY,UKOIL"
+            r = await client.get(
+                f"https://api.twelvedata.com/price?symbol={symbols}&apikey={TD_KEY}"
+            )
+            data = r.json()
+            results["xauusd"]  = float(data["XAU/USD"]["price"])
+            results["xagusd"]  = float(data["XAG/USD"]["price"])
+            results["usdinr"]  = float(data["USD/INR"]["price"])
+            results["audinr"]  = float(data["AUD/INR"]["price"])
+            results["dxy"]     = float(data["DXY"]["price"])
+            results["brent"]   = float(data["UKOIL"]["price"])
