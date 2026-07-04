@@ -4,6 +4,80 @@ Each entry documents a decision that shaped the architecture. These are captured
 
 ---
 
+## Index
+
+| ADR | Title |
+|-----|-------|
+| [ADR-000](#adr-000-project-philosophy) | Project Philosophy |
+| [ADR-001](#adr-001-plain-htmlcssjs--no-frontend-framework) | Plain HTML/CSS/JS — No Frontend Framework |
+| [ADR-002](#adr-002-cloudflare-pages--no-dedicated-backend-server) | Cloudflare Pages — No Dedicated Backend Server |
+| [ADR-003](#adr-003-cloudflare-pages-functions--not-a-separate-worker-service) | Cloudflare Pages Functions — Not a Separate Worker Service |
+| [ADR-004](#adr-004-single-file-spa-indexhtml) | Single-File SPA (`index.html`) |
+| [ADR-005](#adr-005-no-build-step) | No Build Step |
+| [ADR-006](#adr-006-client-side-pin-gate-with-sha-256) | Client-Side PIN Gate with SHA-256 |
+| [ADR-007](#adr-007-aes-256-gcm-client-side-encryption-of-the-upstox-token) | AES-256-GCM Client-Side Encryption of the Upstox Token |
+| [ADR-008](#adr-008-localstorage-for-all-persistence--no-database) | `localStorage` for All Persistence — No Database |
+| [ADR-009](#adr-009-the-pulse_-localstorage-key-prefix) | The `pulse_` localStorage Key Prefix |
+| [ADR-010](#adr-010-_v3-versioning-suffix-on-localstorage-keys) | `_v3` Versioning Suffix on LocalStorage Keys |
+| [ADR-011](#adr-011-three-tier-ltp-fallback--upstox--nse--manual) | Three-Tier LTP Fallback — Upstox → NSE → Manual |
+| [ADR-012](#adr-012-upstox-token-transmitted-as-http-header-not-url-param-or-request-body) | Upstox Token Transmitted as HTTP Header |
+| [ADR-013](#adr-013-cc-positions-hardcoded-in-indexhtml-not-config-driven) | CC Positions Hardcoded in `index.html` |
+| [ADR-014](#adr-014-upstox-underlyings-map-hardcoded-in-the-function) | Upstox `UNDERLYINGS` Map Hardcoded in the Function |
+| [ADR-015](#adr-015-plive-flag-reset-at-every-loadcc-call) | `p.live` Flag Reset at Every `loadCC()` Call |
+| [ADR-016](#adr-016-sequential-nse-fetches-with-350ms-inter-request-delay) | Sequential NSE Fetches with 350ms Inter-Request Delay |
+| [ADR-017](#adr-017-public-cache-control-on-cloudflare-edge-for-api-responses) | `public` Cache-Control on Cloudflare Edge for API Responses |
+| [ADR-018](#adr-018-anthropic-claude-api-for-ai-briefing--optional-not-required) | Anthropic Claude API for AI Briefing — Optional, Not Required |
+
+---
+
+## ADR-000: Project Philosophy
+
+**Decision:** Pulse will be governed by the following enduring principles. Every subsequent architectural decision must be consistent with them. When a proposed change conflicts with these principles, the conflict must be made explicit and the principles must be the default winner unless a compelling case is made to the contrary.
+
+**Context:** Pulse is a long-term personal decision-support platform. The objective is not to maximise features but to build a trustworthy, maintainable, and production-ready system whose behaviour remains understandable over time. The codebase will be touched infrequently — sometimes weeks or months apart — by a single engineer or an AI assistant with no prior session context. Under these conditions, architectural clarity and documented intent are more valuable than feature density.
+
+**The principles:**
+
+1. **Reliability over feature count.** A dashboard that is always correct and always loads is more valuable than one with more features that sometimes fails silently.
+
+2. **Simplicity over unnecessary complexity.** Every abstraction, dependency, and indirection has a carrying cost. Add them only when they eliminate a real problem, not a hypothetical one.
+
+3. **Evidence over assumptions.** Do not guess at what an API returns, what a library does, or what the user wants. Read the source, check the response, ask the user.
+
+4. **Transparency over hidden automation.** The system should behave predictably. Automated behaviour that the user cannot observe or override is a liability in a personal finance tool.
+
+5. **Documentation as part of the product.** An undocumented system is a system that cannot be safely maintained. READMEs, ADRs, changelogs, and test plans are first-class deliverables, not afterthoughts.
+
+6. **Small, incremental improvements over large rewrites.** A working system with known limitations is better than a rewrite with unknown ones. Improve incrementally; rewrite only when incremental improvement is demonstrably blocked.
+
+7. **Root-cause fixes rather than symptom patches.** Understand why something is broken before deciding how to fix it. A patch that hides a symptom creates the next incident.
+
+8. **Production stability before new features.** The existing surface must work correctly and reliably before new capabilities are added. Features do not compensate for unreliable foundations.
+
+9. **Security and privacy by default.** Sensitive data (tokens, positions, portfolio values) must be protected at rest and in transit by default. Security must not be opt-in or left as a follow-up task.
+
+10. **Every significant architectural decision should be documented before it is forgotten.** If a decision required thought, the thought belongs in this file so the next engineer does not have to reconstruct it.
+
+**Consequences:**
+
+*Benefits:*
+- Consistent engineering decisions across sessions and contributors.
+- Easier onboarding for future engineers and AI assistants who can read intent, not just code.
+- Reduced technical debt through disciplined scope control.
+- Better long-term maintainability through explicit trade-off awareness.
+- Architectural continuity across intermittent development cycles.
+
+*Trade-offs:*
+- Slower feature development — discipline before implementation takes time.
+- More documentation — this is a feature, not overhead.
+- Higher discipline required before implementation — changes must be justified, not just attempted.
+
+**Date:** 2026-07-04
+
+**Future review criteria:** Review only if the overall purpose of Pulse fundamentally changes — for example, if it becomes a multi-user product, a commercial service, or is handed to a different engineering team with different constraints. The principles themselves are not version-specific; the application of them to specific decisions is.
+
+---
+
 ## ADR-001: Plain HTML/CSS/JS — No Frontend Framework
 
 **Decision:** The entire frontend is written in vanilla HTML5, CSS3, and ES2020+ JavaScript. No React, Vue, Angular, Svelte, or any other UI framework is used.
