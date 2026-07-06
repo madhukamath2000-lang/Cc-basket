@@ -34,7 +34,7 @@ export async function onRequest(context) {
         for (const row of j?.data || []) {
           const k = String(row.strike_price);
           const ce = row.call_options?.market_data;
-          if (ce) strikes[k] = { CE: { ltp: ce.ltp, oi: ce.oi, prevClose: ce.close_price } };
+          if (ce) strikes[k] = { CE: { ltp: ce.ltp, oi: ce.oi, prevClose: ce.close_price, iv: ce.iv ?? null } };
         }
         out[sym] = { underlying: j?.data?.[0]?.underlying_spot_price, usedExpiry: expiry, strikes };
       } catch (e) {

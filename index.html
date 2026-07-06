@@ -902,7 +902,7 @@ function ccBestStrike(spot,strikes,minOtmPct,maxOtmPct){
     if(k<lo||k>hi) continue;
     const ce=d.CE;
     if(!ce||typeof ce.ltp!=='number'||ce.ltp<=0) continue;
-    if(!best||ce.ltp>best.ltp) best={strike:k,ltp:ce.ltp,oi:ce.oi||0,prevClose:ce.prevClose||0};
+    if(!best||ce.ltp>best.ltp) best={strike:k,ltp:ce.ltp,oi:ce.oi||0,prevClose:ce.prevClose||0,iv:ce.iv??null};
   }
   return best;
 }
@@ -932,6 +932,7 @@ function ccWriteAdvisory(sym,spot,strikes,dte,lot,cfg,secondarySpot){
     sl,slAmt,lot,dte,spot,
     otmPct:otmPct.toFixed(1),premLot:Math.round(premLot),capReq:Math.round(capReq),
     annRet:annRet.toFixed(1),oi:best.oi,
+    iv:best.iv!=null?best.iv.toFixed(1):null,
     assignRisk:otmPct>6?'LOW':otmPct>3?'MEDIUM':'HIGH',
     action,validation,reason,
   };
@@ -1057,6 +1058,7 @@ function renderWriteCandidates(){
        <div class="adv-row"><span>CAPITAL / LOT</span><span>₹${a.capReq.toLocaleString('en-IN')}</span></div>
        <div class="adv-row"><span>ASSIGNMENT RISK</span><span class="${riskCls(a.assignRisk)}">${a.assignRisk}</span></div>
        <div class="adv-row"><span>OPEN INTEREST</span><span>${a.oi.toLocaleString('en-IN')}</span></div>
+       ${a.iv!=null?`<div class="adv-row"><span>IMPLIED VOL (IV)</span><span>${a.iv}%</span></div>`:''}
        ${a.validation?`<div class="adv-row"><span>⚠ VALIDATION</span><span style="color:#D9A845;font-size:9px">${a.validation}</span></div>`:''}
        <div class="adv-reason">${a.reason}</div>`}
     </div>`;

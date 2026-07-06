@@ -32,7 +32,7 @@ function ccBestStrike(spot, strikes, minOtmPct, maxOtmPct) {
     if (k < lo || k > hi) continue;
     const ce = d.CE;
     if (!ce || typeof ce.ltp !== 'number' || ce.ltp <= 0) continue;
-    if (!best || ce.ltp > best.ltp) best = { strike: k, ltp: ce.ltp, oi: ce.oi || 0 };
+    if (!best || ce.ltp > best.ltp) best = { strike: k, ltp: ce.ltp, oi: ce.oi || 0, iv: ce.iv ?? null };
   }
   return best;
 }
@@ -54,7 +54,7 @@ function ccWriteAdvisory(sym, spot, strikes, dte, lot, cfg, secondarySpot) {
   return {
     sym, strike: best.strike, ltp: best.ltp, sl, lot, dte, spot,
     otmPct: otmPct.toFixed(1), premLot: Math.round(premLot), capReq: Math.round(capReq),
-    annRet: annRet.toFixed(1), oi: best.oi,
+    annRet: annRet.toFixed(1), oi: best.oi, iv: best.iv != null ? best.iv.toFixed(1) : null,
     assignRisk: otmPct > 6 ? 'LOW' : otmPct > 3 ? 'MEDIUM' : 'HIGH',
     action, validation,
     reason: `${annRet.toFixed(1)}% ann · ${otmPct.toFixed(1)}% OTM · ₹${Math.round(premLot)} premium/lot · ${dte}d DTE`,
@@ -200,6 +200,16 @@ console.log('\nT9 · HOLD: 75%+ captured but fresh fails hurdle');
   test('captPct >= 70', String(a.captPct >= 70), 'true');
   test('action', a.action, 'HOLD');
   test('reason mentions fails hurdle', String(a.reason.includes('hurdle')), 'true');
+}
+
+/* T10 — IV propagated from chain data to advisory output */
+console.log('\nT10 · IV propagated: Upstox iv field flows through to advisory');
+{
+  // Strike includes iv=32.5 from Upstox market_data
+  const strikes = { '1900': { CE: { ltp: 24, oi: 120000, prevClose: 22, iv: 32.5 } } };
+  const a = ccWriteAdvisory('HDFCBANK', 1800, strikes, 28, 550, CC_CFG_TEST, null);
+  test('iv present', String(a.iv != null), 'true');
+  test('iv value', String(a.iv), '32.5');
 }
 
 /* ── summary ── */
