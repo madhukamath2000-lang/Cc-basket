@@ -202,14 +202,23 @@ console.log('\nT9 · HOLD: 75%+ captured but fresh fails hurdle');
   test('reason mentions fails hurdle', String(a.reason.includes('hurdle')), 'true');
 }
 
-/* T10 — IV propagated from chain data to advisory output */
-console.log('\nT10 · IV propagated: Upstox iv field flows through to advisory');
+/* T10 — IV propagated from option_greeks (correct Upstox v2 location) */
+console.log('\nT10 · IV: option_greeks.iv flows through to advisory output');
 {
-  // Strike includes iv=32.5 from Upstox market_data
+  // Simulates Upstox v2 response after extraction: iv already resolved in the CE object
   const strikes = { '1900': { CE: { ltp: 24, oi: 120000, prevClose: 22, iv: 32.5 } } };
   const a = ccWriteAdvisory('HDFCBANK', 1800, strikes, 28, 550, CC_CFG_TEST, null);
-  test('iv present', String(a.iv != null), 'true');
+  test('iv present when option_greeks.iv exists', String(a.iv != null), 'true');
   test('iv value', String(a.iv), '32.5');
+}
+
+/* T10b — IV gracefully null when not returned by Upstox */
+console.log('\nT10b · IV: null when no greeks field in response');
+{
+  const strikes = { '1900': { CE: { ltp: 24, oi: 120000, prevClose: 22, iv: null } } };
+  const a = ccWriteAdvisory('HDFCBANK', 1800, strikes, 28, 550, CC_CFG_TEST, null);
+  test('iv null when absent', String(a.iv), 'null');
+  test('action still WRITE_NOW despite missing IV', a.action, 'WRITE_NOW');
 }
 
 /* ── summary ── */

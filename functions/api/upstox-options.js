@@ -34,7 +34,12 @@ export async function onRequest(context) {
         for (const row of j?.data || []) {
           const k = String(row.strike_price);
           const ce = row.call_options?.market_data;
-          if (ce) strikes[k] = { CE: { ltp: ce.ltp, oi: ce.oi, prevClose: ce.close_price, iv: ce.iv ?? null } };
+          if (!ce) continue;
+          // IV lives in option_greeks in the Upstox v2 schema, not in market_data.
+          // Check all known locations in priority order; null if absent.
+          const g = row.call_options?.option_greeks;
+          const iv = g?.iv ?? g?.implied_volatility ?? ce?.iv ?? ce?.implied_volatility ?? null;
+          strikes[k] = { CE: { ltp: ce.ltp, oi: ce.oi, prevClose: ce.close_price, iv } };
         }
         out[sym] = { underlying: j?.data?.[0]?.underlying_spot_price, usedExpiry: expiry, strikes };
       } catch (e) {

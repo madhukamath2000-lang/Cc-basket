@@ -1058,7 +1058,7 @@ function renderWriteCandidates(){
        <div class="adv-row"><span>CAPITAL / LOT</span><span>₹${a.capReq.toLocaleString('en-IN')}</span></div>
        <div class="adv-row"><span>ASSIGNMENT RISK</span><span class="${riskCls(a.assignRisk)}">${a.assignRisk}</span></div>
        <div class="adv-row"><span>OPEN INTEREST</span><span>${a.oi.toLocaleString('en-IN')}</span></div>
-       ${a.iv!=null?`<div class="adv-row"><span>IMPLIED VOL (IV)</span><span>${a.iv}%</span></div>`:''}
+       <div class="adv-row"><span>IMPLIED VOL (IV)</span><span>${a.iv!=null?a.iv+'%':'<span style="color:var(--muted2)">unavailable</span>'}</span></div>
        ${a.validation?`<div class="adv-row"><span>⚠ VALIDATION</span><span style="color:#D9A845;font-size:9px">${a.validation}</span></div>`:''}
        <div class="adv-reason">${a.reason}</div>`}
     </div>`;
