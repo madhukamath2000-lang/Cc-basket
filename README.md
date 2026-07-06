@@ -12,13 +12,66 @@ It is intentionally simple: one HTML file, a handful of Cloudflare Pages Functio
 
 ---
 
+## Pulse Advisory v1 — Status
+
+**Release:** `v1.0.0-advisory` · **Commit:** `3c93bc7` · **Branch:** `claude/pulse-cc-basket-fix-7epdll`
+
+The CC Basket tab now includes a real-time covered-call advisory engine. For each symbol with live Upstox data it emits a single, numerically grounded recommendation — `WRITE_NOW`, `WAIT`, `HOLD`, `ROLL`, `RECYCLE`, `CLOSE`, `EXTEND`, or `DATA_MISSING` — with the exact contract, yield figures, and reasoning.
+
+**Frozen:** No new quant features (Delta, Greeks, IV analytics) until ≥3 live expiry cycles validate v1 recommendations. See `TODO_v2.md`.
+
+---
+
+## Architecture
+
+```
+Browser (index.html — single SPA file)
+│
+├── PIN gate (PBKDF2 key derivation, AES-256-GCM)
+│   └── Upstox token: encrypted in localStorage, decrypted transiently in memory
+│
+├── Tab: CC Basket
+│   ├── loadCC()
+│   │   ├── 1. Reset p.live, _upstoxErr, _writeAdv, _posAdv
+│   │   ├── 2. Fetch /api/upstox-options?expiry=YYYY-MM-DD
+│   │   │       └── Cloudflare Pages Function → Upstox v2 API (token forwarded, never stored)
+│   │   ├── 3. applyChain(): write Upstox LTPs → set p.live = true
+│   │   ├── 4. NSE fallback fetch (skipped if p.live already true)
+│   │   ├── 5. ccWriteAdvisory() for each CC_UNIVERSE symbol
+│   │   ├── 6. ccPositionAdvisory() for each open position
+│   │   └── 7. renderCC() + renderAdvisory()
+│   │
+│   ├── ccBestStrike(spot, strikes, minOtmPct, maxOtmPct)
+│   │   └── Returns highest-LTP CE in the OTM band
+│   ├── ccWriteAdvisory(sym, spot, strikes, dte, lot, cfg, secondarySpot)
+│   │   └── Returns: strike, LTP, SL, annRet, OTM%, capReq, IV, action, reason
+│   └── ccPositionAdvisory(p, spot, strikes, dte, cfg, bestFresh)
+│       └── Returns: captPct, premRem, remAnn, assignProb, action, reason
+│
+├── Tab: Overview → /api/summary (Cloudflare Function → Anthropic Claude API)
+├── Tab: Markets → Yahoo Finance query1.finance.yahoo.com
+├── Tab: Stocks → Yahoo Finance
+├── Tab: MF → mfapi.in (AMFI)
+├── Tab: Metals → Yahoo Finance
+└── Tab: Home → static valuation
+
+Cloudflare Pages Functions (functions/api/)
+├── upstox-options.js   ← CC LTPs + IV from Upstox v2 option chain
+├── nse-options.js      ← NSE fallback (unreliable from cloud IPs)
+└── summary.js          ← AI briefing via Claude
+
+Persistence: localStorage only (via LS.get/LS.set helpers, pulse_ prefix)
+```
+
+---
+
 ## Features
 
 | Tab | What it does |
 |-----|-------------|
 | **Overview** | Aggregated net worth snapshot across all modules; AI briefing via Claude |
 | **Markets** | Live quotes for equity indices and global ETFs via Yahoo Finance |
-| **CC Basket** | Covered call position tracker — live LTPs from Upstox → NSE → manual fallback; MTM P&L, decay bars, action signals |
+| **CC Basket** | Covered call advisory engine — write candidates, open position decisions, live LTPs from Upstox → NSE → manual fallback; MTM P&L, decay bars |
 | **Stocks** | Individual equity holdings with live prices and P&L |
 | **MF** | Mutual fund NAVs via mfapi.in (AMFI data, no key required) |
 | **Metals** | Gold and silver price tracking |
