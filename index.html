@@ -932,7 +932,7 @@ function ccWriteAdvisory(sym,spot,strikes,dte,lot,cfg,secondarySpot){
     sl,slAmt,lot,dte,spot,
     otmPct:otmPct.toFixed(1),premLot:Math.round(premLot),capReq:Math.round(capReq),
     annRet:annRet.toFixed(1),oi:best.oi,
-    iv:best.iv!=null?best.iv.toFixed(1):null,
+    iv:(best.iv!=null&&best.iv>0)?best.iv.toFixed(1):null,
     assignRisk:otmPct>6?'LOW':otmPct>3?'MEDIUM':'HIGH',
     action,validation,reason,
   };

@@ -36,9 +36,10 @@ export async function onRequest(context) {
           const ce = row.call_options?.market_data;
           if (!ce) continue;
           // IV lives in option_greeks in the Upstox v2 schema, not in market_data.
-          // Check all known locations in priority order; null if absent.
+          // Check all known locations in priority order; null if absent or zero (0% IV is not meaningful).
           const g = row.call_options?.option_greeks;
-          const iv = g?.iv ?? g?.implied_volatility ?? ce?.iv ?? ce?.implied_volatility ?? null;
+          const rawIv = g?.iv ?? g?.implied_volatility ?? ce?.iv ?? ce?.implied_volatility ?? null;
+          const iv = (rawIv != null && rawIv > 0) ? rawIv : null;
           strikes[k] = { CE: { ltp: ce.ltp, oi: ce.oi, prevClose: ce.close_price, iv } };
         }
         out[sym] = { underlying: j?.data?.[0]?.underlying_spot_price, usedExpiry: expiry, strikes };

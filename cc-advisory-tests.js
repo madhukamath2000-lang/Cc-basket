@@ -54,7 +54,7 @@ function ccWriteAdvisory(sym, spot, strikes, dte, lot, cfg, secondarySpot) {
   return {
     sym, strike: best.strike, ltp: best.ltp, sl, lot, dte, spot,
     otmPct: otmPct.toFixed(1), premLot: Math.round(premLot), capReq: Math.round(capReq),
-    annRet: annRet.toFixed(1), oi: best.oi, iv: best.iv != null ? best.iv.toFixed(1) : null,
+    annRet: annRet.toFixed(1), oi: best.oi, iv: (best.iv != null && best.iv > 0) ? best.iv.toFixed(1) : null,
     assignRisk: otmPct > 6 ? 'LOW' : otmPct > 3 ? 'MEDIUM' : 'HIGH',
     action, validation,
     reason: `${annRet.toFixed(1)}% ann · ${otmPct.toFixed(1)}% OTM · ₹${Math.round(premLot)} premium/lot · ${dte}d DTE`,
@@ -219,6 +219,26 @@ console.log('\nT10b · IV: null when no greeks field in response');
   const a = ccWriteAdvisory('HDFCBANK', 1800, strikes, 28, 550, CC_CFG_TEST, null);
   test('iv null when absent', String(a.iv), 'null');
   test('action still WRITE_NOW despite missing IV', a.action, 'WRITE_NOW');
+}
+
+/* T11 — iv=0 normalized to null (0% IV is not meaningful, same as absent) */
+console.log('\nT11 · IV: iv=0 normalized to null, advisory unaffected');
+{
+  const strikes = { '1900': { CE: { ltp: 24, oi: 120000, prevClose: 22, iv: 0 } } };
+  const a = ccWriteAdvisory('HDFCBANK', 1800, strikes, 28, 550, CC_CFG_TEST, null);
+  test('iv=0 normalized to null', String(a.iv), 'null');
+  test('action unaffected by iv=0', a.action, 'WRITE_NOW');
+}
+
+/* T12 — missing option_greeks entirely: no iv field on CE object */
+console.log('\nT12 · IV: missing option_greeks — no iv field on CE, resolves to null');
+{
+  // Simulates Upstox v2 response where option_greeks is absent from the row:
+  // server-side probe returns null; CE object stored without iv property.
+  const strikes = { '1900': { CE: { ltp: 24, oi: 120000, prevClose: 22 } } };
+  const a = ccWriteAdvisory('HDFCBANK', 1800, strikes, 28, 550, CC_CFG_TEST, null);
+  test('missing option_greeks: iv resolves to null', String(a.iv), 'null');
+  test('missing option_greeks: action unaffected', a.action, 'WRITE_NOW');
 }
 
 /* ── summary ── */
