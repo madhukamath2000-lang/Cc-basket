@@ -112,6 +112,23 @@ details.cfg { margin:10px 0; } details.cfg summary { font-size:10px; color:var(-
 footer { font-size:9.5px; color:var(--muted); text-align:center; padding:18px 14px; letter-spacing:0.1em; line-height:1.8; border-top:1px solid var(--border); margin-top:18px; }
 
 body.locked .brand, body.locked .tabs, body.locked .page, body.locked footer { visibility:hidden; }
+
+/* CC advisory engine */
+.wc-card{background:var(--ink);border-radius:10px;padding:14px;margin-bottom:8px;box-shadow:0 2px 8px rgba(0,0,0,0.18);}
+.wc-sym{font-family:'Chakra Petch',sans-serif;font-size:13px;font-weight:700;color:#D9A845;}
+.wc-strike{font-size:10px;color:#B8A57E;margin-top:2px;}
+.wc-action{display:inline-block;font-size:10px;padding:4px 10px;border-radius:6px;font-weight:700;letter-spacing:0.05em;margin:6px 0;}
+.act-write{background:#0e2e0e;color:#4FD08F;} .act-wait{background:#2a2010;color:#D9A845;}
+.act-recompute{background:#1c1c2e;color:#7799CC;} .act-data-missing{background:#2a1010;color:#FF7585;}
+.act-recycle{background:#0e1e2e;color:#88BBEE;} .act-roll{background:#1e0e2e;color:#CC88EE;} .act-extend{background:#0e1e10;color:#88CC44;}
+.adv-row{display:flex;justify-content:space-between;font-size:10px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.05);}
+.adv-row span:first-child{color:#B8A57E;} .adv-row span:last-child{color:#FDFBF5;font-weight:600;}
+.adv-reason{font-size:10.5px;color:#B8A57E;margin-top:8px;line-height:1.65;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);}
+.adv-risk-low{color:#4FD08F;} .adv-risk-mid{color:#D9A845;} .adv-risk-high{color:#FF7585;}
+.pos-adv{margin-top:9px;padding-top:9px;border-top:1.5px solid var(--border);}
+.pos-adv-row{display:flex;justify-content:space-between;font-size:10px;color:var(--muted2);padding:2.5px 0;}
+.pos-adv-row span:last-child{color:var(--ink);font-weight:600;}
+.pos-adv-reason{font-size:10.5px;color:var(--muted2);margin-top:6px;line-height:1.65;}
 </style>
 </head>
 <body class="locked">
@@ -329,6 +346,10 @@ document.addEventListener('DOMContentLoaded',()=>{
     <div class="total-row big"><span>NET THIS CYCLE</span><span id="cc-net" class="up">—</span></div>
   </div>
   <div id="cc-cards"></div>
+  <div id="cc-write-section" style="display:none">
+    <div class="section-label">◆ WRITE CANDIDATES · LIVE UPSTOX DATA</div>
+    <div id="cc-write-candidates"></div>
+  </div>
   <details class="cfg"><summary>🔑 UPSTOX TOKEN — paste once for live LTPs</summary>
     <div class="cc-card">
       <div style="font-size:10px;color:var(--muted2);margin-bottom:7px;line-height:1.5">Paste your Upstox access token once. It's encrypted (AES-256-GCM, key derived from your PIN) and stored only on this device — never as plain text, never sent to anyone but Upstox. A long-lived token is set-and-forget until it expires; if LTPs go stale, paste a fresh one.</div>
@@ -528,6 +549,25 @@ let CC_POSITIONS = LS.get('cc_positions_v3',null) || [
 // HDFCBANK 760CE bought back at SL (exited ~25.95) → realized -8,332.50, folded into booked below.
 let CYCLE_BOOKED = LS.get('cc_booked_v3', -1762.50);   // INFY+REL+TMPV+ICICI = +6,570, then HDFCBANK -8,332.50
 
+const CC_UNIVERSE={
+  HDFCBANK: {lot:550,yahooSym:'HDFCBANK.NS', minOtmPct:5,maxOtmPct:8},
+  ICICIBANK:{lot:700,yahooSym:'ICICIBANK.NS',minOtmPct:5,maxOtmPct:8},
+  INFY:     {lot:400,yahooSym:'INFY.NS',      minOtmPct:5,maxOtmPct:8},
+  MAZDOCK:  {lot:200,yahooSym:'MAZDOCK.NS',   minOtmPct:5,maxOtmPct:8},
+  RELIANCE: {lot:500,yahooSym:'RELIANCE.NS',  minOtmPct:5,maxOtmPct:8},
+  SUNPHARMA:{lot:350,yahooSym:'SUNPHARMA.NS', minOtmPct:5,maxOtmPct:8},
+  TMPV:     {lot:800,yahooSym:'TMPV.NS',      minOtmPct:5,maxOtmPct:8},
+};
+const CC_CFG=Object.assign({
+  minAnnualisedFloor:12,      // WRITE NOW threshold — ann. return must exceed this %
+  recycleMinCapturedPct:70,   // must have captured ≥70% to trigger RECYCLE evaluation
+  recycleYieldAdvantage:1.5,  // fresh opportunity must yield ≥1.5× remaining yield
+  closeRemainingPremiumTinyPct:10, // CLOSE if ≥90% captured — cost of carry > benefit
+  rollStrikeProximityPct:2,   // ROLL if spot within 2% of strike and dte>5
+  stalePriceTolerancePct:10,  // warn if secondary source spot differs >10%
+  slMultiplier:1.5,           // new write SL = entry × slMultiplier
+},LS.get('cc_cfg',{}));
+
 let STOCKS = [
   { sym:'HDFCBANK',  name:'HDFC Bank',     qty:550,  avg:785.00,  invested:431750.00 },
   { sym:'ICICIBANK', name:'ICICI Bank',    qty:700,  avg:1195.75, invested:837025.00 },
@@ -639,8 +679,8 @@ function setErr(id,msg){ const e=document.getElementById(id); if(!e)return;
   if(msg){e.textContent='⚠ '+msg;e.style.display='block';} else e.style.display='none'; }
 function ageOf(t){ const m=Math.round((Date.now()-t)/60000); return m<60?m+'m':Math.round(m/60)+'h'; }
 let STALE_NOTE='';
-function stamp(id){ const el=document.getElementById(id); if(el) el.textContent=
-  'UPDATED '+new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'})+' SYDNEY'; }
+function sydneyNow(){ return new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',timeZone:'Australia/Sydney'}); }
+function stamp(id){ const el=document.getElementById(id); if(el) el.textContent='UPDATED '+sydneyNow()+' SYDNEY'; }
 function countUp(el, target, fmtFn, ms=800){
   if(!el)return;
   const start=parseFloat(el.dataset.val)||0; const t0=performance.now();
@@ -848,32 +888,138 @@ async function loadMarkets(){
 }
 
 /* ═════════ CC BASKET — UPSTOX PRIMARY → NSE → MANUAL ═════════ */
-function ccRecommend(p,decay){
-  if(p.ltp>=p.sl*0.95) return ['BUY BACK NOW — AT STOP LOSS','act-buyback',1];
-  if(p.ltp>=p.sl*0.85) return ['WATCH — NEAR SL','act-watch',1];
-  if(p.ltp<=p.avg*0.32&&decay>=68) return ['BOOK PROFIT — 28–32% ZONE','act-book',0];
-  if(decay>=80) return ['BOOK PROFIT SOON — '+decay+'% DONE','act-book',0];
-  return ['HOLD — LET THETA WORK','act-hold',0];
+/* Advisory state — reset on each loadCC() call */
+let _writeAdv=[];   // write candidate advisories for all CC_UNIVERSE symbols
+let _posAdv={};     // { stock: position advisory } for each open position
+
+/* ── pure advisory functions ── */
+function ccBestStrike(spot,strikes,minOtmPct,maxOtmPct){
+  if(!strikes||!spot) return null;
+  const lo=spot*(1+minOtmPct/100), hi=spot*(1+maxOtmPct/100);
+  let best=null;
+  for(const [ks,d] of Object.entries(strikes)){
+    const k=parseFloat(ks);
+    if(k<lo||k>hi) continue;
+    const ce=d.CE;
+    if(!ce||typeof ce.ltp!=='number'||ce.ltp<=0) continue;
+    if(!best||ce.ltp>best.ltp) best={strike:k,ltp:ce.ltp,oi:ce.oi||0,prevClose:ce.prevClose||0};
+  }
+  return best;
 }
+
+function ccWriteAdvisory(sym,spot,strikes,dte,lot,cfg,secondarySpot){
+  if(!spot||!strikes||dte<=0) return {sym,action:'DATA_MISSING',reason:'No live Upstox data for this symbol'};
+  const u=CC_UNIVERSE[sym]; if(!u) return {sym,action:'RECOMPUTE',reason:'Not in CC_UNIVERSE'};
+  const best=ccBestStrike(spot,strikes,u.minOtmPct,u.maxOtmPct);
+  if(!best) return {sym,action:'DATA_MISSING',reason:`No liquid CE in ${u.minOtmPct}–${u.maxOtmPct}% OTM band`};
+  const otmPct=(best.strike-spot)/spot*100;
+  const premLot=best.ltp*lot;
+  const capReq=spot*lot;
+  const annRet=(premLot/capReq)*(365/dte)*100;
+  const sl=Math.round(best.ltp*cfg.slMultiplier*20)/20;
+  const slAmt=Math.round((sl-best.ltp)*lot);
+  let validation=null;
+  if(secondarySpot&&Math.abs(secondarySpot-spot)/spot*100>cfg.stalePriceTolerancePct)
+    validation=`Spot ₹${spot.toFixed(0)} vs Yahoo ₹${secondarySpot.toFixed(0)} — verify before writing`;
+  const action=annRet>=cfg.minAnnualisedFloor?'WRITE_NOW':'WAIT';
+  const reason=`${annRet.toFixed(1)}% ann · ${otmPct.toFixed(1)}% OTM · ₹${Math.round(premLot).toLocaleString('en-IN')} premium/lot · ${dte}d DTE`
+    +(action==='WAIT'?` · Below ${cfg.minAnnualisedFloor}% floor — wait for better premium`:'');
+  return {
+    sym,strike:best.strike,ltp:best.ltp,
+    entryLow:Math.round(best.ltp*0.95*20)/20,
+    entryHigh:Math.round(best.ltp*1.05*20)/20,
+    chaseLimit:Math.round(best.ltp*1.10*20)/20,
+    sl,slAmt,lot,dte,spot,
+    otmPct:otmPct.toFixed(1),premLot:Math.round(premLot),capReq:Math.round(capReq),
+    annRet:annRet.toFixed(1),oi:best.oi,
+    assignRisk:otmPct>6?'LOW':otmPct>3?'MEDIUM':'HIGH',
+    action,validation,reason,
+  };
+}
+
+function ccPositionAdvisory(p,spot,strikes,dte,cfg,bestFresh){
+  const captPct=Math.max(0,Math.min(100,Math.round((p.avg-p.ltp)/p.avg*100)));
+  const premRem=p.ltp*p.qty;
+  const capLocked=(spot||p.strike)*p.qty;
+  const remAnn=dte>0?(premRem/capLocked)*(365/dte)*100:0;
+  const otmPct=spot?(p.strike-spot)/spot*100:null;
+  const assignProb=otmPct==null?'—':otmPct<0?'VERY HIGH (ITM)':otmPct<2?'HIGH':otmPct<5?'MEDIUM':'LOW';
+
+  let action='HOLD',reason='';
+  if(p.ltp>=p.sl){
+    action='CLOSE';
+    reason=`LTP ₹${p.ltp} ≥ SL ₹${p.sl}. Stop triggered — buy back immediately.`;
+  } else if(p.ltp>=p.sl*0.90){
+    action='WATCH';
+    reason=`LTP ₹${p.ltp} is within 10% of SL ₹${p.sl}. Elevated risk — monitor tick by tick.`;
+  } else if(otmPct!=null&&otmPct>=0&&otmPct<cfg.rollStrikeProximityPct&&dte>5){
+    action='ROLL';
+    reason=`Spot ₹${spot.toFixed(0)} is only ${otmPct.toFixed(1)}% below ${p.strike} strike — assignment risk rising. Rolling out reduces delta exposure.`;
+  } else if(captPct>=(100-cfg.closeRemainingPremiumTinyPct)){
+    action='CLOSE';
+    reason=`${captPct}% captured — only ₹${Math.round(premRem).toLocaleString('en-IN')} remaining. Cost of carry and margin now exceed remaining benefit.`;
+  } else if(captPct>=cfg.recycleMinCapturedPct&&bestFresh&&bestFresh.action==='WRITE_NOW'){
+    const freshAnn=parseFloat(bestFresh.annRet);
+    if(freshAnn>remAnn*cfg.recycleYieldAdvantage){
+      action='RECYCLE';
+      reason=`${captPct}% captured · remaining yield ${remAnn.toFixed(1)}% ann vs ${bestFresh.sym} fresh at ${freshAnn.toFixed(1)}% (>${cfg.recycleYieldAdvantage}×). Close and redeploy.`;
+    } else {
+      action='HOLD';
+      reason=`${captPct}% captured · remaining ${remAnn.toFixed(1)}% ann. Fresh best (${bestFresh.sym} ${bestFresh.annRet}%) fails ${cfg.recycleYieldAdvantage}× hurdle over remaining — hold.`;
+    }
+  } else if(dte<=5&&captPct<(100-cfg.closeRemainingPremiumTinyPct)){
+    action='EXTEND';
+    reason=`${dte}d to expiry with ${captPct}% captured. Consider writing next cycle to maintain yield continuity.`;
+  } else {
+    action='HOLD';
+    reason=`${captPct}% captured · ₹${Math.round(premRem).toLocaleString('en-IN')} remaining · ${remAnn.toFixed(1)}% ann · ${dte}d left. Let theta decay work.`;
+  }
+
+  return {
+    captPct,premRem:Math.round(premRem),remAnn:remAnn.toFixed(1),
+    capLocked:Math.round(capLocked),dte,
+    otmPct:otmPct!=null?otmPct.toFixed(1):null,
+    assignProb,
+    bestAlt:bestFresh&&bestFresh.action==='WRITE_NOW'
+      ?`${bestFresh.sym} ${bestFresh.strike}CE ₹${bestFresh.ltp} · ${bestFresh.annRet}% ann`:'—',
+    action,reason,
+  };
+}
+
+/* ── render functions ── */
 function renderCC(){
   const c=document.getElementById('cc-cards');
-  let collected=0,pnl=0,booked=0,alerts=0;
+  let collected=0,pnl=0,alerts=0;
+  const ACT_CLS={HOLD:'act-hold',WATCH:'act-watch',CLOSE:'act-buyback',RECYCLE:'act-recycle',ROLL:'act-roll',EXTEND:'act-extend'};
   c.innerHTML=CC_POSITIONS.map(p=>{
     const pos=(p.avg-p.ltp)*p.qty; collected+=p.avg*p.qty; pnl+=pos;
-    const decay=Math.max(0,Math.min(100,Math.round(((p.avg-p.ltp)/p.avg)*100)));
-    booked+=Math.max(0,pos);
-    const [action,actClass,isAlert]=ccRecommend(p,decay); alerts+=isAlert;
+    const adv=_posAdv[p.stock];
+    const captPct=adv?adv.captPct:Math.max(0,Math.min(100,Math.round((p.avg-p.ltp)/p.avg*100)));
+    const action=adv?adv.action:'HOLD';
+    const actCls=ACT_CLS[action]||'act-hold';
+    if(['CLOSE','WATCH','ROLL'].includes(action)) alerts++;
     const srcTag=p.live?(p.src==='upstox'?'<span style="color:var(--green)">UPSTOX LIVE</span>':'<span style="color:var(--blue)">NSE LIVE</span>'):'<span style="color:var(--gold)">MANUAL</span>';
+    const advSection=adv?`
+      <div class="pos-adv">
+        <div class="pos-adv-row"><span>CAPTURED</span><span class="${adv.captPct>=70?'up':adv.captPct>=40?'fl':'dn'}">${adv.captPct}%</span></div>
+        <div class="pos-adv-row"><span>REMAINING ₹</span><span>₹${adv.premRem.toLocaleString('en-IN')}</span></div>
+        <div class="pos-adv-row"><span>REMAINING ANN YIELD</span><span>${adv.remAnn}%</span></div>
+        <div class="pos-adv-row"><span>DTE</span><span>${adv.dte}d</span></div>
+        <div class="pos-adv-row"><span>ASSIGN PROB</span><span class="${adv.assignProb.startsWith('VERY')||adv.assignProb==='HIGH'?'dn':adv.assignProb==='MEDIUM'?'fl':'up'}">${adv.assignProb}</span></div>
+        <div class="pos-adv-row"><span>BEST ALT</span><span style="font-size:9px">${adv.bestAlt}</span></div>
+        <div class="pos-adv-reason">${adv.reason}</div>
+      </div>`:'';
     return `<div class="cc-card">
       <div class="cc-header"><div><div class="cc-name">${p.stock}</div>
         <div class="cc-strike">${p.strike} CE · ${p.qty} qty · ${p.sector} · ${srcTag}</div></div>
         <div><div class="cc-pnl ${pos>=0?'up':'dn'}" id="ccpnl-${p.stock}" data-val="0">—</div><div class="cc-pnl-label">MTM P&L</div></div></div>
       <div class="cc-row"><span>SOLD</span><span>₹${p.avg}</span></div>
       <div class="cc-row"><span>LTP</span><span>₹${p.ltp}</span></div>
-      <div class="cc-row"><span>SL</span><span style="color:var(--red)">₹${p.sl} (loss if hit ₹${p.slAmt.toLocaleString()})</span></div>
-      <div class="cc-bar-bg"><div class="cc-bar" style="width:${decay}%"></div></div>
-      <div class="cc-decay">${p.ltp>p.avg?'ABOVE SOLD — premium underwater':decay+'% DECAYED · '+(100-decay)+'% PREMIUM LEFT'}</div>
-      <span class="cc-action ${actClass}">${action}</span></div>`;
+      <div class="cc-row"><span>SL</span><span style="color:var(--red)">₹${p.sl} (₹${p.slAmt.toLocaleString()} if hit)</span></div>
+      <div class="cc-bar-bg"><div class="cc-bar" style="width:${captPct}%"></div></div>
+      <div class="cc-decay">${p.ltp>p.avg?'ABOVE SOLD — premium underwater':captPct+'% DECAYED · '+(100-captPct)+'% PREMIUM LEFT'}</div>
+      <span class="cc-action ${actCls}">${action}</span>
+      ${advSection}</div>`;
   }).join('');
   CC_POSITIONS.forEach(p=>countUp(document.getElementById('ccpnl-'+p.stock),(p.avg-p.ltp)*p.qty,v=>fmtINR(v)));
   countUp(document.getElementById('cc-total-collected'),collected,v=>fmtINR(v,false));
@@ -884,6 +1030,39 @@ function renderCC(){
   MOD.cc={pnl:CYCLE_BOOKED+pnl,openMtm:pnl,alerts,days:Math.ceil((exp-new Date())/86400000)};
   renderOverview();
 }
+
+function renderWriteCandidates(){
+  const sec=document.getElementById('cc-write-section');
+  const c=document.getElementById('cc-write-candidates');
+  if(!_writeAdv.length){if(sec)sec.style.display='none';return;}
+  if(sec)sec.style.display='block';
+  const riskCls=r=>r==='LOW'?'adv-risk-low':r==='MEDIUM'?'adv-risk-mid':'adv-risk-high';
+  const wActCls={WRITE_NOW:'act-write',WAIT:'act-wait',DATA_MISSING:'act-data-missing',RECOMPUTE:'act-recompute'};
+  c.innerHTML=_writeAdv.map(a=>{
+    const noData=a.action==='DATA_MISSING'||a.action==='RECOMPUTE';
+    const openPos=CC_POSITIONS.find(p=>p.stock===a.sym);
+    const posLabel=openPos?`<span style="font-size:9px;color:#D9A845;margin-left:6px">● OPEN ${openPos.strike}CE</span>`:'';
+    return `<div class="wc-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div><div class="wc-sym">${a.sym}${posLabel}</div>
+          <div class="wc-strike">${noData?a.reason:(a.strike+'CE · '+a.otmPct+'% OTM · '+a.dte+'d · spot ₹'+a.spot.toFixed(0))}</div></div>
+        <span class="wc-action ${wActCls[a.action]||'act-wait'}">${a.action.replace('_',' ')}</span>
+      </div>
+      ${noData?'':
+      `<div class="adv-row"><span>ENTRY RANGE</span><span>₹${a.entryLow} – ₹${a.entryHigh}</span></div>
+       <div class="adv-row"><span>CHASE LIMIT</span><span>₹${a.chaseLimit}</span></div>
+       <div class="adv-row"><span>STOP LOSS (${CC_CFG.slMultiplier}×)</span><span style="color:#FF7585">₹${a.sl} · loss ₹${a.slAmt.toLocaleString('en-IN')}</span></div>
+       <div class="adv-row"><span>PREMIUM / LOT</span><span>₹${a.premLot.toLocaleString('en-IN')}</span></div>
+       <div class="adv-row"><span>ANNUALISED RETURN</span><span class="${parseFloat(a.annRet)>=CC_CFG.minAnnualisedFloor?'adv-risk-low':'adv-risk-high'}">${a.annRet}%</span></div>
+       <div class="adv-row"><span>CAPITAL / LOT</span><span>₹${a.capReq.toLocaleString('en-IN')}</span></div>
+       <div class="adv-row"><span>ASSIGNMENT RISK</span><span class="${riskCls(a.assignRisk)}">${a.assignRisk}</span></div>
+       <div class="adv-row"><span>OPEN INTEREST</span><span>${a.oi.toLocaleString('en-IN')}</span></div>
+       ${a.validation?`<div class="adv-row"><span>⚠ VALIDATION</span><span style="color:#D9A845;font-size:9px">${a.validation}</span></div>`:''}
+       <div class="adv-reason">${a.reason}</div>`}
+    </div>`;
+  }).join('');
+}
+
 async function loadCC(){
   setErr('err-cc',null);
   const exp=nextNSEExpiry(), expStr=expiryNSEFormat(exp), expIso=expiryISO(exp);
@@ -893,6 +1072,10 @@ async function loadCC(){
   let liveCount=0;
   window._upstoxErr=null;
   CC_POSITIONS.forEach(p=>{ p.live=false; });
+  _writeAdv=[]; _posAdv={};
+
+  let chainData={};  // { SYM: { underlying, strikes } } — Upstox primary only
+
   const applyChain=(data,src)=>{
     CC_POSITIONS.forEach(p=>{
       if(p.live) return;
@@ -903,6 +1086,7 @@ async function loadCC(){
       }
     });
   };
+
   // 1) Upstox primary (token decrypted from local AES-GCM blob, held in memory only)
   try{
     const tok=await getUpstoxToken();
@@ -912,9 +1096,14 @@ async function loadCC(){
     if(r.ok&&!rj.error){
       applyChain(rj,'upstox');
       if(liveCount===0){ const firstErr=Object.values(rj).find(v=>v&&v.error); if(firstErr) window._upstoxErr=String(firstErr.error).slice(0,120); }
+      // store clean chain data for advisory engine — only symbols without errors
+      for(const sym of Object.keys(CC_UNIVERSE)){
+        if(rj[sym]&&!rj[sym].error&&rj[sym].underlying&&rj[sym].strikes) chainData[sym]=rj[sym];
+      }
     }
   }catch(e){}
-  // 2) NSE backup for any still manual
+
+  // 2) NSE backup for any still-manual positions
   if(liveCount<CC_POSITIONS.length){
     try{
       const syms=CC_POSITIONS.filter(p=>!p.live).map(p=>p.stock).join(',');
@@ -922,6 +1111,27 @@ async function loadCC(){
       if(r.ok) applyChain(await r.json(),'nse');
     }catch(e){}
   }
+
+  // 3) Advisory engine — only when Upstox chain data available (live prices required)
+  if(Object.keys(chainData).length>0){
+    const rawWrite=Object.keys(CC_UNIVERSE).map(sym=>{
+      const cd=chainData[sym];
+      const secondarySpot=(priceData[CC_UNIVERSE[sym].yahooSym]||{}).price;
+      return ccWriteAdvisory(sym,cd?.underlying,cd?.strikes,days,CC_UNIVERSE[sym].lot,CC_CFG,secondarySpot);
+    });
+    // sort: WRITE_NOW by annualised return desc, then WAIT, then no-data
+    const order={WRITE_NOW:0,WAIT:1,RECOMPUTE:2,DATA_MISSING:3};
+    _writeAdv=rawWrite.sort((a,b)=>{
+      const od=(order[a.action]??2)-(order[b.action]??2);
+      return od!==0?od:parseFloat(b.annRet||0)-parseFloat(a.annRet||0);
+    });
+    const bestFresh=_writeAdv.find(a=>a.action==='WRITE_NOW')||null;
+    CC_POSITIONS.forEach(p=>{
+      const cd=chainData[p.stock];
+      _posAdv[p.stock]=ccPositionAdvisory(p,cd?.underlying,cd?.strikes,days,CC_CFG,bestFresh);
+    });
+  }
+
   stamp('ts-cc');
   if(liveCount===0) setErr('err-cc','Feeds down — last values shown. '+(window._upstoxErr?('UPSTOX: '+window._upstoxErr+'. '):'')+'Manual override below.');
   else if(liveCount<CC_POSITIONS.length) setErr('err-cc',liveCount+'/'+CC_POSITIONS.length+' live — rest last-known');
@@ -930,7 +1140,7 @@ async function loadCC(){
     tokSt.innerHTML = liveCount>0 ? '<span style="color:var(--green)">🔒✓ live — '+liveCount+' position'+(liveCount>1?'s':'')+' pulling current LTPs (token encrypted on-device)</span>'
       : hasTok ? '<span style="color:var(--red)">encrypted token saved but feed rejected it'+(window._upstoxErr?' ('+window._upstoxErr+')':'')+' — it may have expired. Paste a fresh one.</span>'
       : '<span style="color:var(--muted2)">no token — showing last manual values. Paste your token to go live (it\'s encrypted before storing).</span>'; }
-  renderCC(); renderLTPInputs(); renderPosInputs();
+  renderCC(); renderWriteCandidates(); renderLTPInputs(); renderPosInputs();
 }
 function renderPosInputs(){
   const bi=document.getElementById('cc-booked-in'); if(bi) bi.value=CYCLE_BOOKED;
